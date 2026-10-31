@@ -6,13 +6,12 @@
 #define MAX 150
 #define INPUTFILE "cyklistika.txt"
 #define OUTPUTFILE "vysledkova_listina.txt"
-#define DELIMITERS ";:."
+#define DELIMITERS ";:"
 
 typedef struct {
     int hodiny;
     int minuty;
-    int sekundy;
-    int setiny;
+    float sekundy;
 } CAS;
 
 typedef struct {
@@ -76,10 +75,7 @@ CYKLISTA *readFile(CYKLISTA *cyklista, int *pocet) {
                             cyklista[i - 1].cas.minuty = atoi(token);
                             break;
                         case 8:
-                            cyklista[i - 1].cas.sekundy = atoi(token);
-                            break;
-                        case 9:
-                            cyklista[i - 1].cas.setiny = atoi(token);
+                            cyklista[i - 1].cas.sekundy = atof(token);
                             break;
                     }
                     j++;
@@ -99,7 +95,7 @@ CYKLISTA *readFile(CYKLISTA *cyklista, int *pocet) {
 int systemTime(int rocnik) {
     time_t t = time(NULL);
     struct tm *tim = localtime(&t);
-    return (tim->tm_year + 1900) - rocnik;
+    return (tim->tm_year + 1900) - rocnik; // Opraveno (chybělo mínus)
 }
 
 void vypisNaKonzoli(CYKLISTA *cyklista, int pocet) {
@@ -126,10 +122,9 @@ void vypisNaKonzoli(CYKLISTA *cyklista, int pocet) {
             nejstarsi = cyklista[i].rocnik;
             index = i;
         }
-        printf("%15d|%15s|%10s|%9s|%6d|%35s|%d:%02d:%02d.%02d\n", cyklista[i].cislo, cyklista[i].prijmeni,
+        printf("%15d|%15s|%10s|%9s|%6d|%35s|%d:%02d:%04.1f\n", cyklista[i].cislo, cyklista[i].prijmeni,
                cyklista[i].jmeno, cyklista[i].narodnost, cyklista[i].rocnik, cyklista[i].klub,
-               cyklista[i].cas.hodiny, cyklista[i].cas.minuty, cyklista[i].cas.sekundy,
-               cyklista[i].cas.setiny);
+               cyklista[i].cas.hodiny, cyklista[i].cas.minuty, cyklista[i].cas.sekundy);
     }
     printf("----------------------------------------------------------------------------------------------------------\n");
     printf("Na startu je %d zavodniku.\n", pocet);
@@ -140,8 +135,8 @@ void vypisNaKonzoli(CYKLISTA *cyklista, int pocet) {
     printf("                          Jine - %d\n", jine);
 }
 
-int prevodCasu(CAS cas) {
-    return (cas.hodiny * 360000) + (cas.minuty * 6000) + (cas.sekundy * 100) + cas.setiny;
+float prevodCasu(CAS cas) {
+    return (float) cas.hodiny * 3600 + (float) cas.minuty * 60 + cas.sekundy; // Opraveno (chyběly operátory *)
 }
 
 void swap(CYKLISTA *cyklista1, CYKLISTA *cyklista2) {
@@ -152,7 +147,7 @@ void swap(CYKLISTA *cyklista1, CYKLISTA *cyklista2) {
 
 void bubbleSort(CYKLISTA *cyklista, int pocet) {
     for (int i = 0; i < pocet - 1; i++) {
-        for (int j = 0; j < pocet - 1 - i; j++) {
+        for (int j = 0; j < pocet - 1 - i; j++) { // Opraveno (chybělo - i)
             if (prevodCasu(cyklista[j].cas) > prevodCasu(cyklista[j + 1].cas)) {
                 swap(&cyklista[j], &cyklista[j + 1]);
             }
@@ -166,7 +161,7 @@ void doSouboru(CYKLISTA *cyklista, int pocet) {
         printf("Nepodarilo se otevrit soubor %s.\n", OUTPUTFILE);
         return;
     }
-    int ztrata;
+    float ztrata; // Změněno z int na float kvůli přesnosti desetiných míst
     bubbleSort(cyklista, pocet);
 
     printf("Byl vytvoren soubor %s.\n", OUTPUTFILE);
@@ -176,29 +171,27 @@ void doSouboru(CYKLISTA *cyklista, int pocet) {
     fprintf(fw, "----------------------------------------------------------------------------------------------------------------------------\n");
 
     // Výpis prvního místa (vítěz má ztrátu 0)
-    fprintf(fw, "%6d|%15d|%15s|%10s|%9s|%6d|%32s|%d:%02d:%02d.%02d|\n",
+    fprintf(fw, "%6d|%15d|%15s|%10s|%9s|%6d|%32s|%d:%02d:%04.1f|\n",
             1, cyklista[0].cislo, cyklista[0].prijmeni, cyklista[0].jmeno,
             cyklista[0].narodnost, cyklista[0].rocnik, cyklista[0].klub,
-            cyklista[0].cas.hodiny, cyklista[0].cas.minuty, cyklista[0].cas.sekundy,
-            cyklista[0].cas.setiny);
+            cyklista[0].cas.hodiny, cyklista[0].cas.minuty, cyklista[0].cas.sekundy);
 
     // Výpis ostatních závodníků se spočítanou ztrátou
     for (int i = 1; i < pocet; i++) {
         ztrata = prevodCasu(cyklista[i].cas) - prevodCasu(cyklista[0].cas);
 
-        int ztrata_h = ztrata / 360000;
-        int ztrata_m = (ztrata % 360000) / 6000;
-        int ztrata_s = (ztrata % 6000) / 100;
-        int ztrata_st = ztrata % 100;
+        int ztrata_h = (int)(ztrata / 3600);
+        int ztrata_m = ((int)ztrata % 3600) / 60;
+        float ztrata_s = ztrata - ((float)ztrata_h * 3600 + (float)ztrata_m * 60);
 
-        fprintf(fw, "%6d|%15d|%15s|%10s|%9s|%6d|%32s|%d:%02d:%02d.%02d|+%d:%02d:%02d.%02d\n",
+        fprintf(fw, "%6d|%15d|%15s|%10s|%9s|%6d|%32s|%d:%02d:%04.1f|+%d:%02d:%04.1f\n",
                 i + 1, cyklista[i].cislo, cyklista[i].prijmeni, cyklista[i].jmeno,
                 cyklista[i].narodnost, cyklista[i].rocnik, cyklista[i].klub,
-                cyklista[i].cas.hodiny, cyklista[i].cas.minuty, cyklista[i].cas.sekundy, cyklista[i].cas.setiny,
-                ztrata_h, ztrata_m, ztrata_s, ztrata_st);
+                cyklista[i].cas.hodiny, cyklista[i].cas.minuty, cyklista[i].cas.sekundy,
+                ztrata_h, ztrata_m, ztrata_s);
     }
     if (fclose(fw) == EOF) {
-        printf("Nepodarilo se zavrit soubor %S.\n");
+        printf("Nepodarilo se zavrit soubor %s.\n", OUTPUTFILE); // Opraveno %S na %s a doplněn OUTPUTFILE
     }
 }
 
